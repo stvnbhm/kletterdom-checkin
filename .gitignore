@@ -1,0 +1,14 @@
+/storage/sessions/*
+!/storage/sessions/.gitkeep
+/storage/throttle/*
+!/storage/throttle/.gitkeep
+/backups/*
+!/backups/.gitkeep
+/vendor/
+/node_modules/
+.env
+.env.local
+.DS_Store
+/docker/ssl/
+*.log
+/public/assets/css/app.css

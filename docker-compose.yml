@@ -1,0 +1,87 @@
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: kletterdom-checkin-app
+    container_name: kletterdom-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - kletternet
+    environment:
+      - TZ=Europe/Vienna
+    volumes:
+      - ./.env:/var/www/html/.env:ro
+      - ./:/var/www/html
+      - ./storage/sessions:/var/www/html/storage/sessions
+      - ./backups:/var/www/html/backups
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx.Dockerfile
+    image: kletterdom-checkin-nginx
+    container_name: kletterdom-nginx
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/ssl:/etc/nginx/ssl
+      - ./public:/var/www/html/public:ro
+    depends_on:
+      - app
+    networks:
+      - kletternet
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  db:
+    image: mysql:8.0
+    container_name: kletterdom-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: klettercheckin
+      MYSQL_USER: checkinuser
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks:
+      - kletternet
+    healthcheck:
+      test: ["CMD-SHELL", "export MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\"; mysqladmin ping -h 127.0.0.1 -u root 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 360s
+
+  node:
+    image: node:20-alpine
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    profiles: ["build"]
+
+volumes:
+  dbdata:
+
+networks:
+  kletternet:
+    driver: bridge

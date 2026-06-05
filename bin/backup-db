@@ -1,0 +1,79 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Erstellt ein gzipped MySQL-Backup unter backups/.
+ * Behält Backups der letzten 30 Tage; ältere werden entfernt.
+ *
+ * Erwartet, dass `mysqldump` und `gzip` im PATH verfügbar sind.
+ * In Docker-Setups: aus dem app-Container heraus aufrufen.
+ */
+declare(strict_types=1);
+
+use Kletterdom\Bootstrap;
+
+require_once dirname(__DIR__) . '/src/bootstrap.php';
+
+Bootstrap::init();
+
+$dbConf = require dirname(__DIR__) . '/config/database.php';
+
+$backupDir = dirname(__DIR__) . '/backups';
+if (! is_dir($backupDir) && ! mkdir($backupDir, 0775, true) && ! is_dir($backupDir)) {
+    fwrite(STDERR, "Konnte Backup-Verzeichnis nicht erstellen: {$backupDir}\n");
+    exit(1);
+}
+
+$db   = (string) ($dbConf['database'] ?? '');
+$user = (string) ($dbConf['username'] ?? '');
+$pass = (string) ($dbConf['password'] ?? '');
+$host = (string) ($dbConf['host']     ?? '127.0.0.1');
+$port = (string) ($dbConf['port']     ?? '3306');
+
+if ($db === '' || $user === '') {
+    fwrite(STDERR, "DB_DATABASE und DB_USERNAME müssen gesetzt sein.\n");
+    exit(1);
+}
+
+$timestamp = date('Y-m-d_H-i-s');
+$filename  = "kletterdom_{$timestamp}.sql.gz";
+$path      = $backupDir . '/' . $filename;
+
+$cmd = sprintf(
+    'mysqldump --single-transaction --quick --routines --triggers --default-character-set=utf8mb4 -h %s -P %s -u %s %s | gzip -9 > %s',
+    escapeshellarg($host),
+    escapeshellarg($port),
+    escapeshellarg($user),
+    escapeshellarg($db),
+    escapeshellarg($path),
+);
+
+$env = $_SERVER;
+$env['MYSQL_PWD'] = $pass;
+
+$descriptor = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+$process    = proc_open(['sh', '-c', $cmd], $descriptor, $pipes, null, $env);
+
+if (! is_resource($process)) {
+    fwrite(STDERR, "Konnte mysqldump nicht starten.\n");
+    exit(1);
+}
+
+$stderr = stream_get_contents($pipes[2]);
+fclose($pipes[1]);
+fclose($pipes[2]);
+$exit = proc_close($process);
+
+if ($exit !== 0) {
+    @unlink($path);
+    fwrite(STDERR, "Backup fehlgeschlagen (exit={$exit}):\n{$stderr}\n");
+    exit(1);
+}
+
+foreach (glob($backupDir . '/*.sql.gz') ?: [] as $old) {
+    if ((int) filemtime($old) < time() - 30 * 86400) {
+        @unlink($old);
+    }
+}
+
+fwrite(STDOUT, date('c') . " Backup gespeichert: {$filename}\n");
+exit(0);

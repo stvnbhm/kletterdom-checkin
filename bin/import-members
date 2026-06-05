@@ -1,0 +1,63 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Importiert Mitglieder aus einer CSV-Datei.
+ *
+ * Usage: bin/import-members <path/to/members.csv> [--confirm-missing=N]
+ */
+declare(strict_types=1);
+
+use Kletterdom\Bootstrap;
+use Kletterdom\Services\MemberImportService;
+
+require_once dirname(__DIR__) . '/src/bootstrap.php';
+
+$args = array_slice($argv, 1);
+$file = '';
+$confirm = null;
+
+foreach ($args as $token) {
+    if (str_starts_with($token, '--confirm-missing=')) {
+        $confirm = (int) substr($token, strlen('--confirm-missing='));
+    } elseif ($token === '--help' || $token === '-h') {
+        fwrite(STDOUT, "Usage: bin/import-members <csv-file> [--confirm-missing=N]\n");
+        exit(0);
+    } elseif ($file === '') {
+        $file = $token;
+    }
+}
+
+if ($file === '') {
+    fwrite(STDERR, "Usage: bin/import-members <csv-file> [--confirm-missing=N]\n");
+    exit(1);
+}
+
+if (! is_readable($file)) {
+    fwrite(STDERR, "CSV nicht lesbar: {$file}\n");
+    exit(1);
+}
+
+$container = Bootstrap::init();
+/** @var MemberImportService $import */
+$import = $container->get(MemberImportService::class);
+
+$result = $import->import($file, $confirm);
+
+if ($result['status'] === 'needs_confirmation') {
+    fwrite(STDERR, ($result['message'] ?? 'Bestätigung erforderlich.') . "\n");
+    fwrite(STDERR, "Fehlende Mitglieder: " . (int) ($result['missing'] ?? 0) . "\n");
+    fwrite(STDERR, "Erneut mit: bin/import-members {$file} --confirm-missing=" . (int) ($result['missing'] ?? 0) . "\n");
+    exit(2);
+}
+
+if ($result['status'] === 'error') {
+    fwrite(STDERR, ($result['message'] ?? 'Import fehlgeschlagen.') . "\n");
+    exit(1);
+}
+
+$msg = "Import abgeschlossen: " . (int) ($result['imported'] ?? 0) . " Datensätze verarbeitet.";
+if (($result['skipped'] ?? 0) > 0) {
+    $msg .= " (" . (int) $result['skipped'] . " Zeile(n) übersprungen)";
+}
+fwrite(STDOUT, $msg . "\n");
+exit(0);

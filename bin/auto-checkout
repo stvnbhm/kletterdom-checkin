@@ -1,0 +1,58 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Cron-Job: schließt offene Check-ins nach 3 Stunden automatisch.
+ * Aufruf z. B. alle 15 Minuten via Cron auf dem Host.
+ */
+declare(strict_types=1);
+
+use Kletterdom\Bootstrap;
+use Kletterdom\Repositories\CheckinRepository;
+use Kletterdom\Repositories\RegistrationRepository;
+
+require_once dirname(__DIR__) . '/src/bootstrap.php';
+
+$container = Bootstrap::init();
+
+/** @var CheckinRepository $checkins */
+$checkins = $container->get(CheckinRepository::class);
+/** @var RegistrationRepository $registrations */
+$registrations = $container->get(RegistrationRepository::class);
+
+$cutoff = date('Y-m-d H:i:s', strtotime('-3 hours'));
+$expired = $checkins->expiredOpen($cutoff);
+
+$closed = 0;
+foreach ($expired as $row) {
+    $closedAt = date('Y-m-d H:i:s', strtotime((string) $row['checked_in_at']) + 3 * 3600);
+    $checkins->closeById((int) $row['id'], $closedAt);
+    $closed++;
+
+    $registration = $registrations->find((int) $row['registration_id']);
+    if ($registration === null) {
+        continue;
+    }
+
+    if (! $checkins->hasOpenForRegistration((int) $registration['id'])) {
+        $registrations->update((int) $registration['id'], ['checked_in_at' => null]);
+    }
+
+    $visits = (int) ($registration['trial_visits_count'] ?? 0);
+    if ($registration['member_type'] === 'guest' && $visits >= 3) {
+        $registrations->update((int) $registration['id'], [
+            'access_status' => 'red',
+            'access_reason' => 'Schnupperlimit ausgeschöpft (3/3)',
+        ]);
+    }
+
+    $isUnverifiedMember = $registration['member_type'] === 'member' && empty($registration['member_match']);
+    if ($isUnverifiedMember && $visits >= 3) {
+        $registrations->update((int) $registration['id'], [
+            'access_status' => 'red',
+            'access_reason' => 'Mitgliedsnummer nicht im System – Limit erreicht',
+        ]);
+    }
+}
+
+fwrite(STDOUT, date('c') . " Auto-Checkout abgeschlossen: {$closed} Check-ins geschlossen.\n");
+exit(0);

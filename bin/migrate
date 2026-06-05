@@ -1,0 +1,36 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Wendet sql/schema.sql idempotent auf die konfigurierte Datenbank an.
+ * "Migrate" im einfachsten Sinn: führt das vollständige Schema aus
+ * (CREATE TABLE IF NOT EXISTS) — keine Versionierung nötig, da das
+ * Schema bewusst minimalistisch und stabil ist.
+ */
+declare(strict_types=1);
+
+use Kletterdom\Bootstrap;
+use Kletterdom\Database\Connection;
+
+require_once dirname(__DIR__) . '/src/bootstrap.php';
+
+Bootstrap::init();
+
+$dbConf = require dirname(__DIR__) . '/config/database.php';
+$schema = (string) file_get_contents(dirname(__DIR__) . '/sql/schema.sql');
+
+if ($schema === '') {
+    fwrite(STDERR, "sql/schema.sql ist leer oder nicht lesbar.\n");
+    exit(1);
+}
+
+$pdo = Connection::pdo($dbConf);
+
+try {
+    $pdo->exec($schema);
+} catch (\PDOException $e) {
+    fwrite(STDERR, "Schema konnte nicht angewendet werden: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+fwrite(STDOUT, "Schema wurde erfolgreich angewendet.\n");
+exit(0);
