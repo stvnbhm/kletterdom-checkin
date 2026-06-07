@@ -2,6 +2,7 @@
     'use strict';
 
     var scanUrl = '/self-checkin/scan';
+    var CAMERA_STORAGE_KEY = 'kletterdom_self_checkin_camera';
     var stateConfig = {
         ready: {
             panel: 'bg-slate-800/50 border-slate-600 text-slate-200',
@@ -66,6 +67,7 @@
     var isProcessing = false;
     var resetTimer = null;
     var preferredCameraId = null;
+    var availableCameras = [];
 
     var els = {
         clock: document.getElementById('self-checkin-clock'),
@@ -77,7 +79,15 @@
         scannerPaused: document.getElementById('scanner-paused'),
         scanHeadline: document.getElementById('scan-headline'),
         scanSubline: document.getElementById('scan-subline'),
+        cameraPicker: document.getElementById('camera-picker'),
+        cameraSelect: document.getElementById('camera-select'),
     };
+
+    try {
+        preferredCameraId = localStorage.getItem(CAMERA_STORAGE_KEY);
+    } catch (_) {
+        preferredCameraId = null;
+    }
 
     function updateClock() {
         var now = new Date();
@@ -199,14 +209,96 @@
         finishScanResult(data, response.ok);
     }
 
-    async function pickCamera(cameras) {
+    function isBuiltinCamera(label) {
+        return /front|user|facetime|integrated|built.?in|iris/i.test(label || '');
+    }
+
+    function isUsbCamera(label) {
+        return /usb|uvc|external|webcam|logitech|hd pro|camera|video/i.test(label || '');
+    }
+
+    function pickCamera(cameras) {
         if (preferredCameraId) {
-            var found = cameras.find(function (c) { return c.id === preferredCameraId; });
-            if (found) return found.id;
+            var saved = cameras.find(function (c) { return c.id === preferredCameraId; });
+            if (saved) return saved.id;
         }
-        var frontCam = cameras.find(function (c) { return /front|user|facetime|integrated|built.?in/i.test(c.label || ''); });
-        if (frontCam) return frontCam.id;
+
+        var usbCam = cameras.find(function (c) { return isUsbCamera(c.label); });
+        if (usbCam) return usbCam.id;
+
+        if (cameras.length > 1) {
+            var external = cameras.find(function (c) { return !isBuiltinCamera(c.label); });
+            if (external) return external.id;
+        }
+
         return cameras[0] ? cameras[0].id : null;
+    }
+
+    function populateCameraSelect(cameras, selectedId) {
+        if (!els.cameraSelect) return;
+
+        els.cameraSelect.innerHTML = '';
+        cameras.forEach(function (cam, index) {
+            var opt = document.createElement('option');
+            opt.value = cam.id;
+            opt.text = cam.label || ('Kamera ' + (index + 1));
+            els.cameraSelect.appendChild(opt);
+        });
+
+        if (selectedId) {
+            els.cameraSelect.value = selectedId;
+        }
+
+        if (els.cameraPicker) {
+            els.cameraPicker.classList.toggle('hidden', cameras.length <= 1);
+        }
+    }
+
+    function rememberCamera(cameraId) {
+        preferredCameraId = cameraId;
+        try {
+            localStorage.setItem(CAMERA_STORAGE_KEY, cameraId);
+        } catch (_) {}
+    }
+
+    async function ensureCameraPermission() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Kamera-API nicht verfügbar (HTTPS erforderlich?)');
+        }
+        var stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(function (track) { track.stop(); });
+    }
+
+    async function stopScanner() {
+        if (html5QrCode && scannerRunning) {
+            try { await html5QrCode.stop(); } catch (_) {}
+            scannerRunning = false;
+        }
+    }
+
+    async function startScannerWithCamera(cameraId) {
+        if (!cameraId) {
+            setUiState('error', { headline: 'Technischer Fehler', subline: 'Keine Kamera verfügbar' });
+            return;
+        }
+
+        rememberCamera(cameraId);
+        await stopScanner();
+
+        html5QrCode = new Html5Qrcode('scanner-viewport');
+        await html5QrCode.start(
+            cameraId,
+            {
+                fps: 10,
+                qrbox: function (viewfinderWidth, viewfinderHeight) {
+                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
+                    return { width: edge, height: edge };
+                },
+            },
+            function (decodedText) { handleScan(decodedText); },
+            function () {},
+        );
+        scannerRunning = true;
     }
 
     async function startScanner() {
@@ -214,42 +306,36 @@
             setUiState('error', { headline: 'Technischer Fehler', subline: 'Scanner nicht geladen' });
             return;
         }
+
         try {
-            var cameras = await Html5Qrcode.getCameras();
-            if (!cameras || cameras.length === 0) {
+            await ensureCameraPermission();
+            availableCameras = await Html5Qrcode.getCameras();
+            if (!availableCameras || availableCameras.length === 0) {
                 setUiState('error', { headline: 'Technischer Fehler', subline: 'Keine Kamera gefunden' });
                 return;
             }
-            var cameraId = await pickCamera(cameras);
-            if (!cameraId) {
-                setUiState('error', { headline: 'Technischer Fehler', subline: 'Keine Kamera verfügbar' });
-                return;
-            }
-            preferredCameraId = cameraId;
 
-            if (html5QrCode && scannerRunning) {
-                try { await html5QrCode.stop(); } catch (_) {}
-                scannerRunning = false;
-            }
-
-            html5QrCode = new Html5Qrcode('scanner-viewport');
-            await html5QrCode.start(
-                cameraId,
-                {
-                    fps: 10,
-                    aspectRatio: 1.333,
-                    qrbox: function (viewfinderWidth, viewfinderHeight) {
-                        var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
-                        return { width: edge, height: edge };
-                    },
-                },
-                function (decodedText) { handleScan(decodedText); },
-                function () {},
-            );
-            scannerRunning = true;
-        } catch (_) {
-            setUiState('error', { headline: 'Technischer Fehler', subline: 'Kamerazugriff verweigert oder nicht verfügbar' });
+            var cameraId = pickCamera(availableCameras);
+            populateCameraSelect(availableCameras, cameraId);
+            await startScannerWithCamera(cameraId);
+        } catch (err) {
+            setUiState('error', {
+                headline: 'Technischer Fehler',
+                subline: (err && err.message) ? err.message : 'Kamerazugriff verweigert oder nicht verfügbar',
+            });
         }
+    }
+
+    if (els.cameraSelect) {
+        els.cameraSelect.addEventListener('change', function () {
+            if (isProcessing) return;
+            startScannerWithCamera(els.cameraSelect.value).catch(function (err) {
+                setUiState('error', {
+                    headline: 'Technischer Fehler',
+                    subline: (err && err.message) ? err.message : 'Kamera konnte nicht gestartet werden',
+                });
+            });
+        });
     }
 
     updateClock();

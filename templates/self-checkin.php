@@ -44,6 +44,12 @@
             <div class="flex-shrink-0 mb-4">
                 <h2 id="scan-headline" class="text-2xl md:text-4xl font-bold text-white">QR-Code scannen</h2>
                 <p id="scan-subline" class="text-slate-400 text-lg md:text-xl mt-1">QR-Code vor die Kamera halten</p>
+                <div id="camera-picker" class="hidden mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                    <label for="camera-select" class="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">Kamera</label>
+                    <select id="camera-select"
+                            class="flex-1 min-w-0 rounded-lg border border-slate-600 bg-slate-800 text-slate-100 text-sm px-3 py-2 focus:border-slate-400 focus:ring-1 focus:ring-slate-400">
+                    </select>
+                </div>
             </div>
 
             <div class="flex-1 relative rounded-2xl overflow-hidden bg-black border-2 border-slate-700 min-h-[240px] lg:min-h-0">
