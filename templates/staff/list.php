@@ -132,9 +132,9 @@ $rows = $registrations;
                         <input type="text" name="reason" id="reason-<?= (int) $reg['id'] ?>">
                     </form>
                     <button type="button"
-                            onclick="openCheckinModal(
-                                document.getElementById('checkin-form-<?= (int) $reg['id'] ?>'),
-                                document.getElementById('reason-<?= (int) $reg['id'] ?>'),
+                            onclick='openCheckinModal(
+                                document.getElementById("checkin-form-<?= (int) $reg['id'] ?>"),
+                                document.getElementById("reason-<?= (int) $reg['id'] ?>"),
                                 <?= json_encode($reg['first_name'] . ' ' . $reg['last_name'], JSON_HEX_TAG | JSON_HEX_QUOT) ?>,
                                 <?= json_encode((string) ($reg['access_reason'] ?? ''),     JSON_HEX_TAG | JSON_HEX_QUOT) ?>,
                                 <?= json_encode((string) $reg['access_status'],             JSON_HEX_TAG | JSON_HEX_QUOT) ?>,
@@ -142,7 +142,7 @@ $rows = $registrations;
                                 <?= (int) $visits ?>,
                                 <?= json_encode($past,                                       JSON_HEX_TAG | JSON_HEX_QUOT) ?>,
                                 <?= json_encode((string) ($reg['manual_exception_reason'] ?? ''), JSON_HEX_TAG | JSON_HEX_QUOT) ?>
-                            )"
+                            )'
                             class="w-full inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition min-h-[44px]">
                         Check-in
                     </button>
@@ -279,9 +279,9 @@ $rows = $registrations;
                                     <input type="text" name="reason" id="dt-reason-<?= (int) $reg['id'] ?>">
                                 </form>
                                 <button type="button"
-                                        onclick="openCheckinModal(
-                                            document.getElementById('dt-checkin-form-<?= (int) $reg['id'] ?>'),
-                                            document.getElementById('dt-reason-<?= (int) $reg['id'] ?>'),
+                                        onclick='openCheckinModal(
+                                            document.getElementById("dt-checkin-form-<?= (int) $reg['id'] ?>"),
+                                            document.getElementById("dt-reason-<?= (int) $reg['id'] ?>"),
                                             <?= json_encode($reg['first_name'] . ' ' . $reg['last_name'], JSON_HEX_TAG | JSON_HEX_QUOT) ?>,
                                             <?= json_encode((string) ($reg['access_reason'] ?? ''),     JSON_HEX_TAG | JSON_HEX_QUOT) ?>,
                                             <?= json_encode((string) $reg['access_status'],             JSON_HEX_TAG | JSON_HEX_QUOT) ?>,
@@ -289,7 +289,7 @@ $rows = $registrations;
                                             <?= (int) $visits ?>,
                                             <?= json_encode($past,                                       JSON_HEX_TAG | JSON_HEX_QUOT) ?>,
                                             <?= json_encode((string) ($reg['manual_exception_reason'] ?? ''), JSON_HEX_TAG | JSON_HEX_QUOT) ?>
-                                        )"
+                                        )'
                                         class="w-full inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition min-h-[44px]">
                                     Check-in
                                 </button>

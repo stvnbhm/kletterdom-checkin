@@ -10,6 +10,7 @@
  */
 $token            = $csrf->token();
 $confirmRequired  = $flash->peek('confirm_missing_count_required');
+$storedCsvPath    = $flash->peek('stored_csv_path');
 
 $statusLabels = [
     'green'  => 'Zutritt OK',
@@ -83,14 +84,22 @@ ob_start();
                     <?php if ($confirmRequired !== null): ?>
                         <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                             ⚠️ <strong><?= (int) $confirmRequired ?> Mitglieder</strong> fehlen in der CSV und würden auf „inaktiv" gesetzt.
-                            Bitte die Anzahl unten bestätigen und erneut importieren.
+                            <?php if ($storedCsvPath !== null): ?>
+                                Die CSV wurde zwischengespeichert — bitte nur die Anzahl bestätigen und erneut auf Importieren klicken.
+                            <?php else: ?>
+                                Bitte die Anzahl unten bestätigen und die CSV erneut auswählen.
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
 
                     <div class="flex flex-col gap-1">
                         <label for="confirm_missing_count" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fehlende Mitglieder bestätigen</label>
-                        <input type="number" name="confirm_missing_count" id="confirm_missing_count" placeholder="z. B. 12"
+                        <input type="number" name="confirm_missing_count" id="confirm_missing_count"
+                               value="<?= htmlspecialchars((string) $flash->old('confirm_missing_count'), ENT_QUOTES) ?>"
+                               placeholder="z. B. 12"
                                class="w-36 border border-gray-300 rounded-md px-3 py-1.5 text-sm shadow-sm focus:ring-teal-400 focus:border-teal-400">
+                        <input type="hidden" name="stored_csv_path"
+                               value="<?= htmlspecialchars((string) ($flash->old('stored_csv_path') ?: ($storedCsvPath ?? '')), ENT_QUOTES) ?>">
                     </div>
 
                     <button id="importBtn" type="submit"

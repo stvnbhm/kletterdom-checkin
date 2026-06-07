@@ -138,12 +138,15 @@ final class RegistrationRepository
         $params = [];
 
         if ($query !== null && $query !== '') {
-            $like               = '%' . $query . '%';
-            $where[]            = '(r.first_name LIKE :like
-                                     OR r.last_name  LIKE :like
-                                     OR r.member_number LIKE :like
-                                     OR r.notes      LIKE :like)';
-            $params['like']     = $like;
+            $like = '%' . $query . '%';
+            $where[] = '(r.first_name LIKE :like_fn
+                            OR r.last_name LIKE :like_ln
+                            OR r.member_number LIKE :like_mn
+                            OR r.notes LIKE :like_no)';
+            $params['like_fn'] = $like;
+            $params['like_ln'] = $like;
+            $params['like_mn'] = $like;
+            $params['like_no'] = $like;
         } else {
             $where[] = 'EXISTS (SELECT 1 FROM checkins ci
                                  WHERE ci.registration_id = r.id
@@ -193,10 +196,16 @@ final class RegistrationRepository
         if ($terms !== []) {
             $groupParts = [];
             foreach ($terms as $i => $term) {
-                $like              = '%' . $term . '%';
-                $key               = 'q' . $i;
-                $params[$key]      = $like;
-                $groupParts[]      = "(r.first_name LIKE :{$key} OR r.last_name LIKE :{$key} OR r.member_number LIKE :{$key} OR r.notes LIKE :{$key})";
+                $like = '%' . $term . '%';
+                $fn   = 'q' . $i . 'fn';
+                $ln   = 'q' . $i . 'ln';
+                $mn   = 'q' . $i . 'mn';
+                $no   = 'q' . $i . 'no';
+                $params[$fn] = $like;
+                $params[$ln] = $like;
+                $params[$mn] = $like;
+                $params[$no] = $like;
+                $groupParts[] = "(r.first_name LIKE :{$fn} OR r.last_name LIKE :{$ln} OR r.member_number LIKE :{$mn} OR r.notes LIKE :{$no})";
             }
             $where[] = '(' . implode(' OR ', $groupParts) . ')';
         }

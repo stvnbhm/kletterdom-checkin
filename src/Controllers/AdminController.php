@@ -55,49 +55,95 @@ final class AdminController
 
     public function importMembers(Request $request): Response
     {
-        if (! isset($request->files['members_csv']) || ! is_array($request->files['members_csv'])) {
-            $this->flash->set('error', 'Bitte CSV-Datei auswählen.');
+        $importsDir = dirname(__DIR__, 2) . '/storage/imports';
+        if (! is_dir($importsDir) && ! @mkdir($importsDir, 0775, true) && ! is_dir($importsDir)) {
+            $this->flash->set('error', 'Import-Verzeichnis konnte nicht erstellt werden.');
             return Response::redirect('/admin');
         }
 
-        $file = $request->files['members_csv'];
-        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            $this->flash->set('error', 'Bitte CSV-Datei auswählen.');
-            return Response::redirect('/admin');
-        }
-        if ((int) ($file['size'] ?? 0) > 5 * 1024 * 1024) {
-            $this->flash->set('error', 'CSV ist zu groß (max. 5 MB).');
-            return Response::redirect('/admin');
-        }
+        $storedKey      = null;
+        $csvPath        = null;
+        $deleteOnFinish = false;
 
-        $tmpPath = (string) $file['tmp_name'];
-        if (! is_uploaded_file($tmpPath)) {
-            $this->flash->set('error', 'Ungültiger Upload.');
-            return Response::redirect('/admin');
+        $file = $request->files['members_csv'] ?? null;
+        if (is_array($file) && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            if ((int) ($file['size'] ?? 0) > 5 * 1024 * 1024) {
+                $this->flash->set('error', 'CSV ist zu groß (max. 5 MB).');
+                return Response::redirect('/admin');
+            }
+
+            $tmpPath = (string) ($file['tmp_name'] ?? '');
+            if ($tmpPath === '' || ! is_uploaded_file($tmpPath)) {
+                $this->flash->set('error', 'Ungültiger Upload.');
+                return Response::redirect('/admin');
+            }
+
+            $storedKey = bin2hex(random_bytes(16)) . '.csv';
+            $csvPath   = $importsDir . '/' . $storedKey;
+            if (! move_uploaded_file($tmpPath, $csvPath)) {
+                $this->flash->set('error', 'CSV konnte nicht sicher gespeichert werden.');
+                return Response::redirect('/admin');
+            }
+
+            $deleteOnFinish = true;
+        } else {
+            $storedKey = $this->normalizeStoredCsvKey($request->string('stored_csv_path'));
+            if ($storedKey === null) {
+                $this->flash->set('error', 'Bitte CSV-Datei auswählen.');
+                return Response::redirect('/admin');
+            }
+
+            $csvPath = $importsDir . '/' . $storedKey;
+            if (! is_readable($csvPath)) {
+                $this->flash->set('error', 'Die zwischengespeicherte CSV wurde nicht gefunden. Bitte Datei erneut auswählen.');
+                return Response::redirect('/admin');
+            }
+
+            $deleteOnFinish = true;
         }
 
         $confirm = $request->input('confirm_missing_count');
         $confirm = is_numeric($confirm) ? (int) $confirm : null;
 
-        $result = $this->import->import($tmpPath, $confirm);
+        try {
+            $result = $this->import->import($csvPath, $confirm);
 
-        if ($result['status'] === 'needs_confirmation') {
-            $this->flash->set('warning', $result['message']);
-            $this->flash->set('confirm_missing_count_required', $result['missing']);
+            if ($result['status'] === 'needs_confirmation') {
+                $deleteOnFinish = false;
+                $this->flash->set('warning', $result['message']);
+                $this->flash->set('confirm_missing_count_required', $result['missing']);
+                $this->flash->set('stored_csv_path', $storedKey);
+                return Response::redirect('/admin');
+            }
+
+            if ($result['status'] === 'error') {
+                $deleteOnFinish = false;
+                $this->flash->set('error', $result['message'] ?? 'Import fehlgeschlagen.');
+                $this->flash->set('stored_csv_path', $storedKey);
+                return Response::redirect('/admin');
+            }
+
+            $msg = "Mitgliederimport abgeschlossen: {$result['imported']} Datensätze verarbeitet.";
+            if (($result['skipped'] ?? 0) > 0) {
+                $msg .= " ({$result['skipped']} Zeile(n) mit falscher Spaltenanzahl übersprungen)";
+            }
+            $this->flash->set('success', $msg);
             return Response::redirect('/admin');
+        } finally {
+            if ($deleteOnFinish && $csvPath !== null && is_file($csvPath)) {
+                @unlink($csvPath);
+            }
+        }
+    }
+
+    private function normalizeStoredCsvKey(string $key): ?string
+    {
+        $key = trim($key);
+        if ($key === '' || ! preg_match('/^[a-f0-9]{32}\.csv$/', $key)) {
+            return null;
         }
 
-        if ($result['status'] === 'error') {
-            $this->flash->set('error', $result['message'] ?? 'Import fehlgeschlagen.');
-            return Response::redirect('/admin');
-        }
-
-        $msg = "Mitgliederimport abgeschlossen: {$result['imported']} Datensätze verarbeitet.";
-        if (($result['skipped'] ?? 0) > 0) {
-            $msg .= " ({$result['skipped']} Zeile(n) mit falscher Spaltenanzahl übersprungen)";
-        }
-        $this->flash->set('success', $msg);
-        return Response::redirect('/admin');
+        return $key;
     }
 
     public function deleteInactiveMembers(Request $request): Response
@@ -208,7 +254,7 @@ final class AdminController
             $lastRaw     = $lastCheckins[$regId] ?? null;
             $lastCheckin = $lastRaw ? date('d.m.Y H:i', strtotime($lastRaw)) : '';
 
-            fputcsv($handle, [
+            Csv::writeRow($handle, [
                 Csv::sanitizeCell((string) ($reg['first_name'] ?? '')),
                 Csv::sanitizeCell((string) ($reg['last_name'] ?? '')),
                 $reg['birth_date'] ? date('d.m.Y', strtotime((string) $reg['birth_date'])) : '',

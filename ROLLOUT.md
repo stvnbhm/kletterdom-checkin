@@ -20,14 +20,7 @@ Der Neubau ersetzt die Laravel-App als **Frischstart**: keine Migration alter ve
   ```
 - [ ] `APP_URL` auf die lokale IP/URL setzen (z. B. `https://192.168.178.54`)
 
-### 2. Assets bauen (einmalig oder bei CSS-Änderung)
-
-```bash
-npm install
-npm run build          # Tailwind CSS + vendorte JS
-```
-
-### 3. Erst-Deploy
+### 2. Erst-Deploy (inkl. CSS-Build)
 
 ```bash
 ADMIN_EMAIL=admin@example.com \
@@ -37,12 +30,19 @@ APP_URL=https://192.168.x.x \
 ```
 
 Das Script:
+- baut Tailwind-CSS per Docker (`node`-Container — **npm auf dem Pi nicht nötig**)
 - startet MySQL + PHP-FPM + Nginx
 - wendet `sql/schema.sql` an (leere Tabellen)
 - installiert Composer-Deps im Container
 - legt optional Admin an
 
-### 4. Members importieren
+CSS/JS manuell neu bauen (ohne vollen Deploy):
+
+```bash
+./scripts/build-assets.sh
+```
+
+### 3. Members importieren
 
 ```bash
 docker compose exec -T app php bin/import-members /pfad/zur/mitglieder.csv
@@ -54,14 +54,14 @@ Bei fehlenden Mitgliedern in der CSV (werden inaktiv gesetzt):
 docker compose exec -T app php bin/import-members /pfad/zur/mitglieder.csv --confirm-missing=12
 ```
 
-### 5. Staff anlegen
+### 4. Staff anlegen
 
 ```bash
 docker compose exec -T app php bin/ensure-staff hallendienst@example.com \
   --password='…' --name='Hallendienst'
 ```
 
-### 6. Smoke-Test
+### 5. Smoke-Test
 
 - [ ] `https://<host>/` — Startseite
 - [ ] `/halle-register` — Registrierung (Gast + Mitglied)
@@ -72,7 +72,7 @@ docker compose exec -T app php bin/ensure-staff hallendienst@example.com \
 - [ ] `/self-checkin` — QR-Scanner (grün/blau direkt, orange/rot → Hallendienst)
 - [ ] `/admin` — KPIs, Chart, CSV-Export, Member-Import
 
-### 7. Laravel stoppen, neuer Stack übernimmt
+### 6. Laravel stoppen, neuer Stack übernimmt
 
 ```bash
 cd /pfad/zur/alten-app && docker compose down
@@ -80,7 +80,7 @@ cd /pfad/zur/alten-app && docker compose down
 
 Neuer Stack läuft bereits auf 80/443.
 
-### 8. Cron (Host-crontab)
+### 7. Cron (Host-crontab)
 
 ```cron
 0,15,30,45 * * * * cd /opt/kletterdom-checkin && docker compose exec -T app php cron/auto-checkout.php >> /var/log/kletterdom-cron.log 2>&1
@@ -91,7 +91,7 @@ Neuer Stack läuft bereits auf 80/443.
 
 ```bash
 git pull
-npm run build          # nur bei CSS/JS-Änderungen
+./scripts/build-assets.sh   # nur bei CSS/JS-Änderungen
 docker compose up -d
 ```
 
