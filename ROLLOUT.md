@@ -92,8 +92,16 @@ Neuer Stack läuft bereits auf 80/443.
 ## Updates (ohne Image-Rebuild)
 
 ```bash
-git pull
+git fetch origin
+git reset --hard origin/main
 docker compose up -d
+```
+
+Falls `git reset` mit `Permission denied` bei `storage/imports` abbricht (Verzeichnis gehört `www-data`):
+
+```bash
+sudo chown -R "$USER:$USER" storage/ backups/
+git fetch origin && git reset --hard origin/main
 ```
 
 CSS/JS-Änderungen kommen per `git pull` mit — kein Build auf dem Pi nötig.

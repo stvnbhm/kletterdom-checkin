@@ -251,7 +251,8 @@ run_app_setup() {
     docker compose exec -T app php bin/migrate
 
     log "Ensuring writable directories"
-    docker compose exec -T app sh -c 'mkdir -p storage/sessions storage/throttle backups && chown -R www-data:www-data storage backups 2>/dev/null || chmod -R 775 storage backups'
+    docker compose exec -T app sh -c 'mkdir -p storage/sessions storage/throttle storage/imports backups && chown -R www-data:www-data storage/sessions storage/throttle backups 2>/dev/null || true && chmod -R 775 storage/imports 2>/dev/null || true'
+    fix_storage_permissions
 }
 
 start_services() {
@@ -274,7 +275,24 @@ docker compose version >/dev/null 2>&1 || fail "Docker Compose plugin is require
 
 [[ -f "$ENV_FILE" ]] || { log "Creating .env from .env.example"; cp .env.example "$ENV_FILE"; }
 
-mkdir -p backups docker/ssl storage/sessions storage/throttle
+mkdir -p backups docker/ssl storage/sessions storage/throttle storage/imports
+
+fix_storage_permissions() {
+    mkdir -p storage/sessions storage/throttle storage/imports backups
+    if [[ -w storage && -w storage/imports ]]; then
+        chmod -R u+rwX storage backups 2>/dev/null || true
+        return 0
+    fi
+    log "storage/ gehört vermutlich www-data (Docker) — setze Besitzer auf $(id -un) für git/deploy"
+    if command -v sudo >/dev/null 2>&1; then
+        sudo chown -R "$(id -u)":"$(id -g)" storage backups
+    else
+        fail "storage/ ist nicht beschreibbar. Ausführen: sudo chown -R \$USER:\$USER storage/ backups/"
+    fi
+    chmod -R u+rwX storage backups 2>/dev/null || true
+}
+
+fix_storage_permissions
 
 if [[ -n "${APP_URL:-}" ]]; then
     set_env APP_URL "$APP_URL"
