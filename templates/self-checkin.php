@@ -25,6 +25,12 @@
             width: 100% !important;
             height: 100% !important;
         }
+        /* Native <select> bleibt auf vielen Browsern weiß — keine helle Schrift darauf */
+        #camera-select,
+        #camera-select option {
+            background-color: #ffffff;
+            color: #111827;
+        }
     </style>
 </head>
 <body class="font-sans antialiased bg-slate-950 text-white h-full overflow-hidden">
@@ -47,7 +53,7 @@
                 <div id="camera-picker" class="hidden mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
                     <label for="camera-select" class="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">Kamera</label>
                     <select id="camera-select"
-                            class="flex-1 min-w-0 rounded-lg border border-slate-600 bg-slate-800 text-slate-100 text-sm px-3 py-2 focus:border-slate-400 focus:ring-1 focus:ring-slate-400">
+                            class="flex-1 min-w-0 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
                     </select>
                 </div>
             </div>
