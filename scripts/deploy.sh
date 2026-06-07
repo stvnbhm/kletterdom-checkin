@@ -251,7 +251,7 @@ run_app_setup() {
     docker compose exec -T app php bin/migrate
 
     log "Ensuring writable directories"
-    docker compose exec -T app sh -c 'mkdir -p storage/sessions storage/throttle storage/imports backups && chown -R www-data:www-data storage/sessions storage/throttle backups 2>/dev/null || true && chmod -R 775 storage/imports 2>/dev/null || true'
+    docker compose exec -T app sh -c 'mkdir -p storage/sessions storage/throttle storage/imports backups && chown -R www-data:www-data storage/sessions storage/throttle 2>/dev/null || true && chmod 777 backups 2>/dev/null || true && chmod 775 storage/imports 2>/dev/null || true'
     fix_storage_permissions
 }
 

@@ -1,11 +1,8 @@
-/storage/sessions/*
-!/storage/sessions/.gitkeep
-/storage/throttle/*
-!/storage/throttle/.gitkeep
+/storage/sessions/
+/storage/throttle/
 /storage/imports/*
 !/storage/imports/.gitkeep
-/backups/*
-!/backups/.gitkeep
+/backups/
 /vendor/
 /node_modules/
 .env

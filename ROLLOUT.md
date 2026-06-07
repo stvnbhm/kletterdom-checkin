@@ -92,12 +92,13 @@ Neuer Stack läuft bereits auf 80/443.
 ## Updates (ohne Image-Rebuild)
 
 ```bash
-git fetch origin
-git reset --hard origin/main
+./scripts/sync-from-git.sh
 docker compose up -d
 ```
 
-Falls `git reset` mit `Permission denied` bei `storage/imports` abbricht (Verzeichnis gehört `www-data`):
+Das Sync-Script setzt bei Bedarf `storage/`/`backups/` auf deinen User zurück und macht dann `git reset --hard origin/main`.
+
+Manuell (falls nötig):
 
 ```bash
 sudo chown -R "$USER:$USER" storage/ backups/
