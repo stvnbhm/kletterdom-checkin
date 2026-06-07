@@ -10,7 +10,9 @@ $isAdmin = $auth->isAdmin();
         <div class="flex justify-between h-16 items-center">
 
             <div class="flex items-center gap-6">
-                <a href="/dashboard" class="text-sm font-semibold text-gray-800">Kletterdom</a>
+                <a href="/dashboard" class="shrink-0">
+                    <img src="/assets/images/logo-small.png" alt="ÖTK Logo" class="h-9 w-auto object-contain">
+                </a>
 
                 <div class="hidden sm:flex items-center gap-4">
                     <?php if ($isAdmin): ?>
