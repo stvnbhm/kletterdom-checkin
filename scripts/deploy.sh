@@ -10,6 +10,12 @@ cd "$ROOT_DIR"
 log()  { printf '\n==> %s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
+on_err() {
+    printf 'ERROR: Deploy abgebrochen in Zeile %s (Exit-Code %s)\n' "$1" "$2" >&2
+    exit "$2"
+}
+trap 'on_err ${LINENO} $?' ERR
+
 require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "$1 is required but was not found."
 }
@@ -30,6 +36,8 @@ env_value() {
 
 set_env() {
     local key="$1" value="$2" tmp
+    [[ -f "$ENV_FILE" ]] || fail ".env fehlt: $ENV_FILE"
+    [[ -w "$ENV_FILE" ]] || fail ".env ist nicht beschreibbar: $ENV_FILE (evtl. sudo chown \$USER:$USER .env)"
     tmp="$(mktemp)"
     awk -v key="$key" -v value="$value" '
         BEGIN { updated = 0 }
@@ -40,25 +48,34 @@ set_env() {
     mv "$tmp" "$ENV_FILE"
 }
 
-ensure_env() {
-    local key="$1" fallback="$2"
-    [[ -z "$(env_value "$key")" ]] && set_env "$key" "$fallback"
+random_bytes_hex() {
+    local bytes="$1"
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex "$bytes"
+        return 0
+    fi
+    if [[ -r /dev/urandom ]]; then
+        dd if=/dev/urandom bs="$bytes" count=1 status=none 2>/dev/null | hexdump -ve '1/1 "%02x"'
+        return 0
+    fi
+    if command -v php >/dev/null 2>&1; then
+        php -r 'echo bin2hex(random_bytes((int) $argv[1]));' "$bytes"
+        return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import secrets, sys; print(secrets.token_hex(int(sys.argv[1])))' "$bytes"
+        return 0
+    fi
+    fail "Secrets können nicht erzeugt werden (openssl, php, python3 oder /dev/urandom nötig)."
 }
 
-random_hex() {
-    if command -v openssl >/dev/null 2>&1; then
-        openssl rand -hex 32
-    else
-        docker run --rm php:8.4-cli php -r 'echo bin2hex(random_bytes(32));'
+ensure_env_if_empty() {
+    local key="$1" bytes="$2"
+    if [[ -n "$(env_value "$key")" ]]; then
+        return 0
     fi
-}
-
-random_secret() {
-    if command -v openssl >/dev/null 2>&1; then
-        openssl rand -hex 24
-    else
-        docker run --rm php:8.4-cli php -r 'echo bin2hex(random_bytes(24));'
-    fi
+    log "Generating ${key}"
+    set_env "$key" "$(random_bytes_hex "$bytes")"
 }
 
 host_from_url() {
@@ -92,11 +109,31 @@ ensure_ssl_certs() {
     command -v openssl >/dev/null 2>&1 || fail "openssl is required to generate TLS certificates in docker/ssl/"
 
     log "Generating self-signed TLS certificate (SAN: ${san})"
+    if openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "$key" \
+        -out "$cert" \
+        -subj "/CN=kletterdom.local" \
+        -addext "subjectAltName=${san}" 2>/dev/null; then
+        return 0
+    fi
+
+    local cnf
+    cnf="$(mktemp)"
+    cat > "$cnf" <<EOF
+[req]
+distinguished_name = dn
+x509_extensions = v3
+prompt = no
+[dn]
+[v3]
+subjectAltName = ${san}
+EOF
     openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
         -keyout "$key" \
         -out "$cert" \
         -subj "/CN=kletterdom.local" \
-        -addext "subjectAltName=${san}"
+        -extensions v3 -config "$cnf"
+    rm -f "$cnf"
 }
 
 sql_escape() {
@@ -219,7 +256,9 @@ run_app_setup() {
 
 start_services() {
     local args=(-d)
-    [[ "${SKIP_BUILD:-0}" != "1" ]] && args+=(--build)
+    if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
+        args+=(--build)
+    fi
     require_db_secrets_in_env
     log "Starting database"
     docker compose up "${args[@]}" db
@@ -252,9 +291,10 @@ set_env DB_PORT 3306
 set_env DB_DATABASE "${DB_DATABASE:-klettercheckin}"
 set_env DB_USERNAME "${DB_USERNAME:-checkinuser}"
 
-ensure_env HASH_KEY "$(random_hex)"
-ensure_env DB_PASSWORD "$(random_secret)"
-ensure_env DB_ROOT_PASSWORD "$(random_secret)"
+ensure_env_if_empty HASH_KEY 32
+ensure_env_if_empty DB_PASSWORD 24
+ensure_env_if_empty DB_ROOT_PASSWORD 24
+log "Environment secrets OK"
 
 app_host="$(host_from_url "$(env_value APP_URL)")"
 ssl_san="$(env_value SSL_SUBJECT_ALT_NAME)"
