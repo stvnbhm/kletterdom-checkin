@@ -20,7 +20,7 @@ Der Neubau ersetzt die Laravel-App als **Frischstart**: keine Migration alter ve
   ```
 - [ ] `APP_URL` auf die lokale IP/URL setzen (z. B. `https://192.168.178.54`)
 
-### 2. Erst-Deploy (inkl. CSS-Build)
+### 2. Erst-Deploy
 
 ```bash
 ADMIN_EMAIL=admin@example.com \
@@ -30,16 +30,18 @@ APP_URL=https://192.168.x.x \
 ```
 
 Das Script:
-- baut Tailwind-CSS per Docker (`node`-Container — **npm auf dem Pi nicht nötig**)
+- nutzt die **im Repo enthaltene** `public/assets/css/app.css` (kein Node/npm auf dem Pi)
 - startet MySQL + PHP-FPM + Nginx
 - wendet `sql/schema.sql` an (leere Tabellen)
 - installiert Composer-Deps im Container
 - legt optional Admin an
 
-CSS/JS manuell neu bauen (ohne vollen Deploy):
+CSS/JS nur bei Template-Änderungen neu bauen (Entwickler-Rechner):
 
 ```bash
-./scripts/build-assets.sh
+npm install && npm run build    # oder: ./scripts/build-assets.sh
+git add public/assets/css/app.css public/assets/js/
+git commit -m "Rebuild assets"
 ```
 
 ### 3. Members importieren
@@ -91,9 +93,10 @@ Neuer Stack läuft bereits auf 80/443.
 
 ```bash
 git pull
-./scripts/build-assets.sh   # nur bei CSS/JS-Änderungen
 docker compose up -d
 ```
+
+CSS/JS-Änderungen kommen per `git pull` mit — kein Build auf dem Pi nötig.
 
 ## Rollback
 

@@ -191,19 +191,19 @@ wait_for_app() {
     fail "PHP app container did not become ready. Check 'docker compose logs app'."
 }
 
-build_assets() {
-    if [[ "${SKIP_BUILD_ASSETS:-0}" == "1" ]]; then
-        log "Skipping frontend asset build (SKIP_BUILD_ASSETS=1)"
+ensure_assets() {
+    if [[ "${BUILD_ASSETS:-0}" == "1" ]]; then
+        log "Building frontend assets via Docker (BUILD_ASSETS=1)"
+        mkdir -p "$ROOT_DIR/public/assets/css"
+        docker compose --profile build run --rm node sh -c 'npm ci && npm run build'
         [[ -s "$ROOT_DIR/public/assets/css/app.css" ]] \
-            || fail "public/assets/css/app.css fehlt. Entferne SKIP_BUILD_ASSETS oder führe ./scripts/build-assets.sh aus."
+            || fail "CSS-Build fehlgeschlagen: public/assets/css/app.css wurde nicht erzeugt."
         return 0
     fi
 
-    log "Building frontend assets via Docker (kein npm auf dem Host nötig)"
-    mkdir -p "$ROOT_DIR/public/assets/css"
-    docker compose --profile build run --rm node sh -c 'npm ci && npm run build'
     [[ -s "$ROOT_DIR/public/assets/css/app.css" ]] \
-        || fail "CSS-Build fehlgeschlagen: public/assets/css/app.css wurde nicht erzeugt."
+        || fail "public/assets/css/app.css fehlt. Bitte git pull oder BUILD_ASSETS=1 ./scripts/deploy.sh ausführen."
+    log "Using committed CSS (set BUILD_ASSETS=1 to rebuild)"
 }
 
 run_app_setup() {
@@ -264,7 +264,7 @@ fi
 
 require_db_secrets_in_env
 ensure_ssl_certs
-build_assets
+ensure_assets
 reset_db_volume_if_requested
 start_services
 ensure_mysql_app_credentials

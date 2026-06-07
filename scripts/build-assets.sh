@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Rebuild Tailwind CSS + refresh vendored JS. Nur bei Entwicklung nötig —
+# Produktion nutzt die committete public/assets/css/app.css aus dem Repo.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
