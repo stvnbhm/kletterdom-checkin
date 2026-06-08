@@ -12,6 +12,7 @@ return [
 
     'session' => [
         'lifetime_minutes' => (int) ($_ENV['SESSION_LIFETIME_MINUTES'] ?? 120),
+        'remember_days'    => (int) ($_ENV['SESSION_REMEMBER_DAYS'] ?? 30),
         'secure_cookie'    => filter_var($_ENV['SESSION_SECURE_COOKIE'] ?? 'true', FILTER_VALIDATE_BOOL),
         'same_site'        => $_ENV['SESSION_SAME_SITE'] ?? 'Lax',
         'save_path'        => dirname(__DIR__) . '/storage/sessions',

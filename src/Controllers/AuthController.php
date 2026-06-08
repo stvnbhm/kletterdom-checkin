@@ -38,7 +38,11 @@ final class AuthController
             return Response::redirect('/login');
         }
 
-        if (! $this->auth->attempt($request->string('email'), $request->string('password'))) {
+        if (! $this->auth->attempt(
+            $request->string('email'),
+            $request->string('password'),
+            $request->boolean('remember'),
+        )) {
             $this->flash->setErrors(['email' => 'Anmeldung fehlgeschlagen.']);
             $this->flash->withOld(['email' => $request->string('email')]);
             return Response::redirect('/login');

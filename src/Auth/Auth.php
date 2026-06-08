@@ -17,10 +17,12 @@ final class Auth
     public function __construct(
         private readonly Session        $session,
         private readonly UserRepository $users,
+        private readonly RememberCookie $remember,
+        private readonly int            $sessionLifetimeSeconds,
     ) {
     }
 
-    public function attempt(string $email, string $password): bool
+    public function attempt(string $email, string $password, bool $remember = false): bool
     {
         $user = $this->users->findByEmail($email);
         if ($user === null) {
@@ -34,12 +36,21 @@ final class Auth
         $this->session->set(self::SESSION_KEY, (int) $user['id']);
         $this->user = $user;
 
+        if ($remember) {
+            $this->remember->issue((int) $user['id']);
+            $this->session->extendCookieLifetime($this->remember->lifetimeSeconds());
+        } else {
+            $this->remember->forget();
+            $this->session->extendCookieLifetime($this->sessionLifetimeSeconds);
+        }
+
         return true;
     }
 
     public function logout(): void
     {
         $this->session->forget(self::SESSION_KEY);
+        $this->remember->forget();
         $this->session->regenerate();
         $this->user = null;
     }
@@ -61,15 +72,30 @@ final class Auth
         if ($this->user !== null) {
             return $this->user;
         }
+
         $id = $this->session->get(self::SESSION_KEY);
-        if (! is_int($id) && ! (is_string($id) && ctype_digit($id))) {
-            return null;
-        }
-        $user = $this->users->find((int) $id);
-        if ($user === null) {
+        if (is_int($id) || (is_string($id) && ctype_digit($id))) {
+            $user = $this->users->find((int) $id);
+            if ($user !== null) {
+                return $this->user = $user;
+            }
             $this->session->forget(self::SESSION_KEY);
+        }
+
+        $rememberId = $this->remember->userId();
+        if ($rememberId === null) {
             return null;
         }
+
+        $user = $this->users->find($rememberId);
+        if ($user === null) {
+            $this->remember->forget();
+            return null;
+        }
+
+        $this->session->regenerate();
+        $this->session->set(self::SESSION_KEY, $rememberId);
+        $this->session->extendCookieLifetime($this->remember->lifetimeSeconds());
         return $this->user = $user;
     }
 }

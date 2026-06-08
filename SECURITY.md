@@ -26,7 +26,9 @@ Plain-PHP-Stack ohne Framework: folgende Schutzmechanismen sind **bewusst selbst
 - [x] `session.use_strict_mode`, `session.use_only_cookies`
 - [x] `session.cookie_httponly`, `session.cookie_secure` (konfigurierbar)
 - [x] `session.cookie_samesite` = Lax (Standard)
-- [x] Session-Regeneration beim Login (`Auth::login`)
+- [x] Session-Cookie mit `SESSION_LIFETIME_MINUTES` (nicht nur Browser-Session)
+- [x] Optional „Angemeldet bleiben“ via signiertem `kletterdom_remember`-Cookie (`HMAC-SHA256` mit `HASH_KEY`)
+- [x] Session-Regeneration beim Login (`Auth::attempt`)
 
 ## Passwörter
 
