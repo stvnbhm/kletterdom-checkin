@@ -68,6 +68,7 @@
     var resetTimer = null;
     var preferredCameraId = null;
     var availableCameras = [];
+    var mobileDevice = isMobileDevice();
 
     var els = {
         clock: document.getElementById('self-checkin-clock'),
@@ -83,10 +84,17 @@
         cameraSelect: document.getElementById('camera-select'),
     };
 
-    try {
-        preferredCameraId = localStorage.getItem(CAMERA_STORAGE_KEY);
-    } catch (_) {
-        preferredCameraId = null;
+    if (!mobileDevice) {
+        try {
+            preferredCameraId = localStorage.getItem(CAMERA_STORAGE_KEY);
+        } catch (_) {
+            preferredCameraId = null;
+        }
+    }
+
+    function isMobileDevice() {
+        return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+            || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent));
     }
 
     function updateClock() {
@@ -209,15 +217,35 @@
         finishScanResult(data, response.ok);
     }
 
+    function isBackCamera(label) {
+        return /back|rear|environment|rück|hinten|wide/i.test(label || '');
+    }
+
+    function isFrontCamera(label) {
+        return /front|user|facetime|selfie|vorne/i.test(label || '');
+    }
+
     function isBuiltinCamera(label) {
-        return /front|user|facetime|integrated|built.?in|iris/i.test(label || '');
+        return isFrontCamera(label) || /integrated|built.?in|iris/i.test(label || '');
     }
 
     function isUsbCamera(label) {
-        return /usb|uvc|external|webcam|logitech|hd pro|camera|video/i.test(label || '');
+        return /usb|uvc|external|webcam|logitech|hd pro/i.test(label || '');
     }
 
     function pickCamera(cameras) {
+        if (mobileDevice) {
+            var backCam = cameras.find(function (c) { return isBackCamera(c.label); });
+            if (backCam) return backCam.id;
+
+            if (cameras.length > 1) {
+                var notFront = cameras.find(function (c) { return !isFrontCamera(c.label); });
+                if (notFront) return notFront.id;
+            }
+
+            return cameras[0] ? cameras[0].id : null;
+        }
+
         if (preferredCameraId) {
             var saved = cameras.find(function (c) { return c.id === preferredCameraId; });
             if (saved) return saved.id;
@@ -232,6 +260,34 @@
         }
 
         return cameras[0] ? cameras[0].id : null;
+    }
+
+    function resolveCameraConstraints(cameraId) {
+        if (!mobileDevice) {
+            return cameraId;
+        }
+
+        var cam = availableCameras.find(function (c) { return c.id === cameraId; });
+        if (!cam || isBackCamera(cam.label)) {
+            return { facingMode: { ideal: 'environment' } };
+        }
+        if (isFrontCamera(cam.label)) {
+            return { facingMode: { ideal: 'user' } };
+        }
+
+        return { facingMode: { ideal: 'environment' } };
+    }
+
+    function scannerConfig() {
+        return {
+            fps: mobileDevice ? 15 : 10,
+            qrbox: function (viewfinderWidth, viewfinderHeight) {
+                var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.68);
+                edge = Math.max(180, Math.min(edge, 300));
+                return { width: edge, height: edge };
+            },
+            disableFlip: false,
+        };
     }
 
     function populateCameraSelect(cameras, selectedId) {
@@ -255,6 +311,7 @@
     }
 
     function rememberCamera(cameraId) {
+        if (mobileDevice) return;
         preferredCameraId = cameraId;
         try {
             localStorage.setItem(CAMERA_STORAGE_KEY, cameraId);
@@ -265,7 +322,10 @@
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             throw new Error('Kamera-API nicht verfügbar (HTTPS erforderlich?)');
         }
-        var stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        var constraints = mobileDevice
+            ? { video: { facingMode: { ideal: 'environment' } } }
+            : { video: true };
+        var stream = await navigator.mediaDevices.getUserMedia(constraints);
         stream.getTracks().forEach(function (track) { track.stop(); });
     }
 
@@ -277,24 +337,20 @@
     }
 
     async function startScannerWithCamera(cameraId) {
-        if (!cameraId) {
+        if (!cameraId && !mobileDevice) {
             setUiState('error', { headline: 'Technischer Fehler', subline: 'Keine Kamera verfügbar' });
             return;
         }
 
-        rememberCamera(cameraId);
+        if (cameraId) {
+            rememberCamera(cameraId);
+        }
         await stopScanner();
 
         html5QrCode = new Html5Qrcode('scanner-viewport');
         await html5QrCode.start(
-            cameraId,
-            {
-                fps: 10,
-                qrbox: function (viewfinderWidth, viewfinderHeight) {
-                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
-                    return { width: edge, height: edge };
-                },
-            },
+            resolveCameraConstraints(cameraId),
+            scannerConfig(),
             function (decodedText) { handleScan(decodedText); },
             function () {},
         );
@@ -311,6 +367,11 @@
             await ensureCameraPermission();
             availableCameras = await Html5Qrcode.getCameras();
             if (!availableCameras || availableCameras.length === 0) {
+                if (mobileDevice) {
+                    populateCameraSelect([], null);
+                    await startScannerWithCamera(null);
+                    return;
+                }
                 setUiState('error', { headline: 'Technischer Fehler', subline: 'Keine Kamera gefunden' });
                 return;
             }
