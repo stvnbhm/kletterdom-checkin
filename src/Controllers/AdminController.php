@@ -56,8 +56,13 @@ final class AdminController
     public function importMembers(Request $request): Response
     {
         $importsDir = dirname(__DIR__, 2) . '/storage/imports';
-        if (! is_dir($importsDir) && ! @mkdir($importsDir, 0775, true) && ! is_dir($importsDir)) {
+        if (! is_dir($importsDir) && ! @mkdir($importsDir, 0777, true) && ! is_dir($importsDir)) {
             $this->flash->set('error', 'Import-Verzeichnis konnte nicht erstellt werden.');
+            return Response::redirect('/admin');
+        }
+
+        if (! is_writable($importsDir)) {
+            $this->flash->set('error', 'Import-Verzeichnis ist nicht beschreibbar.');
             return Response::redirect('/admin');
         }
 
@@ -80,7 +85,7 @@ final class AdminController
 
             $storedKey = bin2hex(random_bytes(16)) . '.csv';
             $csvPath   = $importsDir . '/' . $storedKey;
-            if (! move_uploaded_file($tmpPath, $csvPath)) {
+            if (! @move_uploaded_file($tmpPath, $csvPath)) {
                 $this->flash->set('error', 'CSV konnte nicht sicher gespeichert werden.');
                 return Response::redirect('/admin');
             }

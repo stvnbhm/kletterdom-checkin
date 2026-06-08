@@ -251,7 +251,7 @@ run_app_setup() {
     docker compose exec -T app php bin/migrate
 
     log "Ensuring writable directories"
-    docker compose exec -T app sh -c 'mkdir -p storage/sessions storage/throttle storage/imports backups && chown -R www-data:www-data storage/sessions storage/throttle 2>/dev/null || true && chmod 777 backups 2>/dev/null || true && chmod 775 storage/imports 2>/dev/null || true'
+    docker compose exec -T app sh -c 'mkdir -p storage/sessions storage/throttle storage/imports backups && chown -R www-data:www-data storage/sessions storage/throttle 2>/dev/null || true && chmod 777 backups storage/imports 2>/dev/null || true'
     fix_storage_permissions
 }
 
@@ -281,6 +281,7 @@ fix_storage_permissions() {
     mkdir -p storage/sessions storage/throttle storage/imports backups
     if [[ -w storage && -w storage/imports ]]; then
         chmod -R u+rwX storage backups 2>/dev/null || true
+        chmod 777 storage/imports 2>/dev/null || true
         return 0
     fi
     log "storage/ gehört vermutlich www-data (Docker) — setze Besitzer auf $(id -un) für git/deploy"
@@ -290,6 +291,7 @@ fix_storage_permissions() {
         fail "storage/ ist nicht beschreibbar. Ausführen: sudo chown -R \$USER:\$USER storage/ backups/"
     fi
     chmod -R u+rwX storage backups 2>/dev/null || true
+    chmod 777 storage/imports 2>/dev/null || true
 }
 
 fix_storage_permissions
