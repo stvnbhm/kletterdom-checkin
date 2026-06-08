@@ -4,18 +4,47 @@
 <html lang="de">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="<?= htmlspecialchars($csrf->token(), ENT_QUOTES) ?>">
     <title>Self-Check-in | Kletterdom</title>
     <link rel="stylesheet" href="/assets/css/app.css">
     <style>
-        html, body { height: 100%; margin: 0; overflow: hidden; }
-        #self-checkin-app { height: 100vh; min-height: 32rem; }
-        #scanner-viewport { position: relative; width: 100%; height: 100%; min-height: 280px; }
-        #scanner-viewport video {
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+        @supports (height: 100dvh) {
+            html, body { height: 100dvh; }
+        }
+        #self-checkin-app {
+            height: 100vh;
+            height: 100dvh;
+            min-height: -webkit-fill-available;
+            min-height: 32rem;
+        }
+        #self-checkin-main {
+            grid-template-rows: minmax(0, 1.2fr) minmax(0, 0.8fr);
+        }
+        @media (min-width: 1024px) {
+            #self-checkin-main {
+                grid-template-rows: none;
+            }
+        }
+        #scanner-viewport,
+        #scanner-viewport__scan_region {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 280px;
+        }
+        #scanner-viewport video,
+        #scanner-viewport canvas,
+        #scanner-viewport__scan_region video,
+        #scanner-viewport__scan_region canvas {
             width: 100% !important;
             height: 100% !important;
-            object-fit: cover !important;
+            object-fit: contain !important;
             display: block;
         }
         #scanner-viewport__dashboard { display: none !important; }
@@ -25,11 +54,30 @@
             width: 100% !important;
             height: 100% !important;
         }
-        /* Native <select> bleibt auf vielen Browsern weiß — keine helle Schrift darauf */
         #camera-select,
         #camera-select option {
             background-color: #ffffff;
             color: #111827;
+        }
+        @media (max-width: 1023px) {
+            #status-panel {
+                padding: 1.5rem;
+            }
+            #status-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+            }
+            #status-headline {
+                font-size: 1.75rem;
+            }
+            #status-subline {
+                font-size: 1.125rem;
+            }
+            #status-hint-ready {
+                margin-top: 1.5rem;
+                padding-top: 1.5rem;
+                font-size: 0.95rem;
+            }
         }
     </style>
 </head>
@@ -37,14 +85,15 @@
 
 <div id="self-checkin-app" class="flex flex-col overflow-hidden h-full min-h-screen">
 
-    <header class="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80">
+    <header class="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80"
+            style="padding-top: max(1rem, env(safe-area-inset-top));">
         <div>
             <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">Kletterdom Self-Check-in</h1>
         </div>
         <time id="self-checkin-clock" class="text-2xl md:text-3xl font-mono font-semibold text-slate-300 tabular-nums"></time>
     </header>
 
-    <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-0">
+    <div id="self-checkin-main" class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-0">
 
         <section class="flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-900 p-4 md:p-6">
             <div class="flex-shrink-0 mb-4">
@@ -58,7 +107,7 @@
                 </div>
             </div>
 
-            <div class="flex-1 relative rounded-2xl overflow-hidden bg-black border-2 border-slate-700 min-h-[240px] lg:min-h-0">
+            <div class="flex-1 relative rounded-2xl overflow-hidden bg-black border-2 border-slate-700 min-h-[280px] lg:min-h-0">
                 <div id="scanner-viewport" class="absolute inset-0"></div>
                 <div id="scanner-paused" class="hidden absolute inset-0 z-20 bg-slate-900/70 flex items-center justify-center">
                     <p class="text-xl md:text-2xl font-semibold text-slate-200">Code wird geprüft …</p>
@@ -90,7 +139,8 @@
         </section>
     </div>
 
-    <footer class="flex-shrink-0 px-6 py-2 text-center text-xs text-slate-600 border-t border-slate-800">
+    <footer class="flex-shrink-0 px-6 py-2 text-center text-xs text-slate-600 border-t border-slate-800"
+            style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
         Auto-Reset nach Ergebnis
     </footer>
 </div>
