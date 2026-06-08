@@ -25,6 +25,12 @@ ob_start();
                        class="block mt-1 w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
             </div>
 
+            <div class="flex items-center">
+                <input id="remember" type="checkbox" name="remember" value="1"
+                       class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                <label for="remember" class="ml-2 text-sm text-gray-700">Angemeldet bleiben</label>
+            </div>
+
             <div class="flex justify-end">
                 <button type="submit"
                         class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition">

@@ -21,6 +21,20 @@ final class Session
         session_regenerate_id($deleteOld);
     }
 
+    public function extendCookieLifetime(int $lifetimeSeconds): void
+    {
+        $this->start();
+        $params = session_get_cookie_params();
+        setcookie(session_name(), session_id(), [
+            'expires'  => time() + max(60, $lifetimeSeconds),
+            'path'     => $params['path'] !== '' ? $params['path'] : '/',
+            'domain'   => $params['domain'],
+            'secure'   => (bool) $params['secure'],
+            'httponly' => (bool) $params['httponly'],
+            'samesite' => $params['samesite'] ?? 'Lax',
+        ]);
+    }
+
     public function destroy(): void
     {
         $this->start();

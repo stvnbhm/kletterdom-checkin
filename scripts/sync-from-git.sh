@@ -21,7 +21,7 @@ if [[ "$need_fix" == "1" ]]; then
         exit 1
     fi
     sudo chown -R "$(id -u)":"$(id -g)" storage backups
-    chmod 777 storage/imports 2>/dev/null || true
+    chmod 777 storage/imports storage/sessions 2>/dev/null || true
 fi
 
 git fetch origin

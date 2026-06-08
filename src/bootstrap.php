@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kletterdom;
 
 use Kletterdom\Auth\Auth;
+use Kletterdom\Auth\RememberCookie;
 use Kletterdom\Database\Connection;
 use Kletterdom\Http\Csrf;
 use Kletterdom\Http\Flash;
@@ -84,7 +85,7 @@ final class Bootstrap
         date_default_timezone_set($config['timezone']);
 
         if (! is_dir($config['session']['save_path'])) {
-            @mkdir($config['session']['save_path'], 0775, true);
+            @mkdir($config['session']['save_path'], 0777, true);
         }
 
         self::configureSession($config['session']);
@@ -108,9 +109,18 @@ final class Bootstrap
         $container->set(RegistrationRepository::class, static fn (Container $c) => new RegistrationRepository($c->get(PDO::class)));
         $container->set(CheckinRepository::class,      static fn (Container $c) => new CheckinRepository($c->get(PDO::class)));
 
+        $container->set(RememberCookie::class, static fn () => new RememberCookie(
+            $config['hash_key'],
+            $config['session']['secure_cookie'],
+            $config['session']['same_site'],
+            $config['session']['remember_days'],
+        ));
+
         $container->set(Auth::class, static fn (Container $c) => new Auth(
             $c->get(Session::class),
             $c->get(UserRepository::class),
+            $c->get(RememberCookie::class),
+            $config['session']['lifetime_minutes'] * 60,
         ));
 
         $container->set(Qr::class, static fn () => new Qr());
@@ -164,21 +174,28 @@ final class Bootstrap
         return $container;
     }
 
-    /** @param array{lifetime_minutes:int, secure_cookie:bool, same_site:string, save_path:string} $session */
+    /** @param array{lifetime_minutes:int, remember_days:int, secure_cookie:bool, same_site:string, save_path:string} $session */
     private static function configureSession(array $session): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
             return;
         }
 
+        $lifetime = $session['lifetime_minutes'] * 60;
+
         ini_set('session.use_strict_mode', '1');
         ini_set('session.use_only_cookies', '1');
-        ini_set('session.cookie_httponly', '1');
-        ini_set('session.cookie_secure', $session['secure_cookie'] ? '1' : '0');
-        ini_set('session.cookie_samesite', $session['same_site']);
-        ini_set('session.gc_maxlifetime', (string) ($session['lifetime_minutes'] * 60));
+        ini_set('session.gc_maxlifetime', (string) $lifetime);
         ini_set('session.save_handler', 'files');
         session_save_path($session['save_path']);
         session_name('kletterdom_session');
+        session_set_cookie_params([
+            'lifetime' => $lifetime,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => $session['secure_cookie'],
+            'httponly' => true,
+            'samesite' => $session['same_site'],
+        ]);
     }
 }
