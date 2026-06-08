@@ -37,9 +37,10 @@ COPY composer.json composer.lock* ./
 RUN composer install --no-dev --no-scripts --no-interaction --optimize-autoloader 2>/dev/null \
     || composer install --no-dev --no-scripts --no-interaction --optimize-autoloader
 
-RUN mkdir -p storage/sessions storage/throttle backups \
+RUN mkdir -p storage/sessions storage/throttle storage/imports backups \
     && chown -R www-data:www-data storage backups \
-    && chmod -R 775 storage backups
+    && chmod -R 775 storage backups \
+    && chmod 777 storage/imports
 
 EXPOSE 9000
 
