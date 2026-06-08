@@ -82,6 +82,7 @@
         scanSubline: document.getElementById('scan-subline'),
         cameraPicker: document.getElementById('camera-picker'),
         cameraSelect: document.getElementById('camera-select'),
+        scannerViewport: document.getElementById('scanner-viewport'),
     };
 
     if (!mobileDevice) {
@@ -95,6 +96,12 @@
     function isMobileDevice() {
         return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
             || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent));
+    }
+
+    function whenLayoutReady(callback) {
+        requestAnimationFrame(function () {
+            requestAnimationFrame(callback);
+        });
     }
 
     function updateClock() {
@@ -218,7 +225,7 @@
     }
 
     function isBackCamera(label) {
-        return /back|rear|environment|rück|hinten|wide/i.test(label || '');
+        return /back|rear|environment|rück|hinten|wide|tele/i.test(label || '');
     }
 
     function isFrontCamera(label) {
@@ -262,32 +269,47 @@
         return cameras[0] ? cameras[0].id : null;
     }
 
-    function resolveCameraConstraints(cameraId) {
-        if (!mobileDevice) {
-            return cameraId;
+    function buildVideoConstraints(cameraId) {
+        if (mobileDevice) {
+            var cam = cameraId
+                ? availableCameras.find(function (c) { return c.id === cameraId; })
+                : null;
+
+            if (cam && isFrontCamera(cam.label)) {
+                return { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
+            }
+
+            if (cam && cameraId) {
+                return { deviceId: { exact: cameraId }, width: { ideal: 1280 }, height: { ideal: 720 } };
+            }
+
+            return { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } };
         }
 
-        var cam = availableCameras.find(function (c) { return c.id === cameraId; });
-        if (!cam || isBackCamera(cam.label)) {
-            return { facingMode: { ideal: 'environment' } };
-        }
-        if (isFrontCamera(cam.label)) {
-            return { facingMode: { ideal: 'user' } };
+        if (cameraId) {
+            return { deviceId: { exact: cameraId } };
         }
 
-        return { facingMode: { ideal: 'environment' } };
+        return { facingMode: 'user' };
     }
 
-    function scannerConfig() {
-        return {
-            fps: mobileDevice ? 15 : 10,
-            qrbox: function (viewfinderWidth, viewfinderHeight) {
-                var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.68);
+    function scannerConfig(cameraId) {
+        var config = {
+            fps: mobileDevice ? 10 : 10,
+            disableFlip: false,
+            useBarCodeDetectorIfSupported: !mobileDevice,
+            videoConstraints: buildVideoConstraints(cameraId),
+        };
+
+        if (!mobileDevice) {
+            config.qrbox = function (viewfinderWidth, viewfinderHeight) {
+                var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72);
                 edge = Math.max(180, Math.min(edge, 300));
                 return { width: edge, height: edge };
-            },
-            disableFlip: false,
-        };
+            };
+        }
+
+        return config;
     }
 
     function populateCameraSelect(cameras, selectedId) {
@@ -318,17 +340,6 @@
         } catch (_) {}
     }
 
-    async function ensureCameraPermission() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('Kamera-API nicht verfügbar (HTTPS erforderlich?)');
-        }
-        var constraints = mobileDevice
-            ? { video: { facingMode: { ideal: 'environment' } } }
-            : { video: true };
-        var stream = await navigator.mediaDevices.getUserMedia(constraints);
-        stream.getTracks().forEach(function (track) { track.stop(); });
-    }
-
     async function stopScanner() {
         if (html5QrCode && scannerRunning) {
             try { await html5QrCode.stop(); } catch (_) {}
@@ -347,10 +358,13 @@
         }
         await stopScanner();
 
-        html5QrCode = new Html5Qrcode('scanner-viewport');
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode('scanner-viewport');
+        }
+
         await html5QrCode.start(
-            resolveCameraConstraints(cameraId),
-            scannerConfig(),
+            { facingMode: 'environment' },
+            scannerConfig(cameraId),
             function (decodedText) { handleScan(decodedText); },
             function () {},
         );
@@ -363,8 +377,15 @@
             return;
         }
 
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setUiState('error', {
+                headline: 'Technischer Fehler',
+                subline: 'Kamera-API nicht verfügbar (HTTPS erforderlich?)',
+            });
+            return;
+        }
+
         try {
-            await ensureCameraPermission();
             availableCameras = await Html5Qrcode.getCameras();
             if (!availableCameras || availableCameras.length === 0) {
                 if (mobileDevice) {
@@ -403,9 +424,13 @@
     setInterval(updateClock, 1000);
     setUiState('ready');
 
+    function bootScanner() {
+        whenLayoutReady(startScanner);
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startScanner);
+        document.addEventListener('DOMContentLoaded', bootScanner);
     } else {
-        startScanner();
+        bootScanner();
     }
 })();

@@ -24,36 +24,31 @@
             min-height: 32rem;
         }
         #self-checkin-main {
-            grid-template-rows: minmax(0, 1.2fr) minmax(0, 0.8fr);
+            grid-template-rows: minmax(0, 1.35fr) minmax(0, 0.65fr);
         }
         @media (min-width: 1024px) {
             #self-checkin-main {
                 grid-template-rows: none;
             }
         }
-        #scanner-viewport,
-        #scanner-viewport__scan_region {
-            position: relative;
-            width: 100%;
-            height: 100%;
+        /*
+         * Only style the scanner container — NOT the <video>/<canvas> that
+         * html5-qrcode injects. Forcing object-fit/100% on those elements
+         * breaks the library's videoWidth/clientWidth scan math on iOS.
+         */
+        #scanner-shell {
             min-height: 280px;
         }
-        #scanner-viewport video,
-        #scanner-viewport canvas,
-        #scanner-viewport__scan_region video,
-        #scanner-viewport__scan_region canvas {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: contain !important;
-            display: block;
+        @media (max-width: 1023px) {
+            #scanner-shell {
+                min-height: 42dvh;
+            }
+        }
+        #scanner-viewport {
+            width: 100%;
+            height: 100%;
         }
         #scanner-viewport__dashboard { display: none !important; }
-        #qr-shaded-region {
-            position: absolute !important;
-            inset: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-        }
         #camera-select,
         #camera-select option {
             background-color: #ffffff;
@@ -61,22 +56,22 @@
         }
         @media (max-width: 1023px) {
             #status-panel {
-                padding: 1.5rem;
+                padding: 1.25rem;
             }
             #status-icon {
-                font-size: 3rem;
-                margin-bottom: 1rem;
+                font-size: 2.5rem;
+                margin-bottom: 0.75rem;
             }
             #status-headline {
-                font-size: 1.75rem;
+                font-size: 1.5rem;
             }
             #status-subline {
-                font-size: 1.125rem;
+                font-size: 1rem;
             }
             #status-hint-ready {
-                margin-top: 1.5rem;
-                padding-top: 1.5rem;
-                font-size: 0.95rem;
+                margin-top: 1rem;
+                padding-top: 1rem;
+                font-size: 0.9rem;
             }
         }
     </style>
@@ -96,7 +91,7 @@
     <div id="self-checkin-main" class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-0">
 
         <section class="flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-900 p-4 md:p-6">
-            <div class="flex-shrink-0 mb-4">
+            <div class="flex-shrink-0 mb-3">
                 <h2 id="scan-headline" class="text-2xl md:text-4xl font-bold text-white">QR-Code scannen</h2>
                 <p id="scan-subline" class="text-slate-400 text-lg md:text-xl mt-1">QR-Code vor die Kamera halten</p>
                 <div id="camera-picker" class="hidden mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
@@ -107,14 +102,14 @@
                 </div>
             </div>
 
-            <div class="flex-1 relative rounded-2xl overflow-hidden bg-black border-2 border-slate-700 min-h-[280px] lg:min-h-0">
+            <div id="scanner-shell" class="flex-1 relative rounded-2xl overflow-hidden bg-black border-2 border-slate-700 lg:min-h-0">
                 <div id="scanner-viewport" class="absolute inset-0"></div>
                 <div id="scanner-paused" class="hidden absolute inset-0 z-20 bg-slate-900/70 flex items-center justify-center">
                     <p class="text-xl md:text-2xl font-semibold text-slate-200">Code wird geprüft …</p>
                 </div>
             </div>
 
-            <p class="flex-shrink-0 mt-4 text-slate-500 text-sm md:text-base text-center lg:text-left">
+            <p class="flex-shrink-0 mt-3 text-slate-500 text-sm md:text-base text-center lg:text-left">
                 Probleme? Bitte beim Hallendienst melden.
             </p>
         </section>
@@ -146,7 +141,7 @@
 </div>
 
 <?= \Kletterdom\Support\VendorAssets::scriptTag('html5-qrcode.min.js') ?>
-<script src="/assets/js/self-checkin.js"></script>
+<script src="/assets/js/self-checkin.js?v=20260608"></script>
 
 </body>
 </html>
